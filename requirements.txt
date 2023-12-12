@@ -1,7 +1,8 @@
-aio-msgpack-rpc
-certifi
-charset-normalizer
-idna
-msgpack
-requests
-urllib3
+aio-msgpack-rpc==0.2.0
+certifi==2023.11.17
+charset-normalizer==3.3.2
+idna==3.6
+msgpack==1.0.7
+python-decouple==3.8
+requests==2.31.0
+urllib3==2.1.0

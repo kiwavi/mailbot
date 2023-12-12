@@ -3,12 +3,17 @@
 import requests
 import time
 import json
-import NewMailService
+from server import NewMailService
+from decouple import config
+from threading import Timer
+import threading
+
+TOKEN = config('TOKEN')
 
 MAILTM_HEADERS = {   
     "Accept": "application/json",
     "Content-Type": "application/json",
-    "Authorization":"Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MDIzODQ0NjEsInJvbGVzIjpbIlJPTEVfVVNFUiJdLCJhZGRyZXNzIjoibXVueWlyaTFAd2lyZWNvbm5lY3RlZC5jb20iLCJpZCI6IjY1Nzg0ZjkxOWJhMjU2NWZmNjBmYmYwMyIsIm1lcmN1cmUiOnsic3Vic2NyaWJlIjpbIi9hY2NvdW50cy82NTc4NGY5MTliYTI1NjVmZjYwZmJmMDMiXX19.kHgYramr6D7IrYl5KYtzMsGikcWeeJwozRJBrDji1fccOrztbf1tnzpPuZRiF6ptTqSjRihglvMwU0UvlHhNyw"
+    "Authorization":"Bearer " + TOKEN
 }
 
 class MailTmError(Exception):
@@ -63,41 +68,12 @@ BASE_URL = 'https://api.mail.tm'
 
 mypage = BASE_URL + '/me'
 
-# request to get the id and token
-
-# my_data = requests.post(BASE_URL + '/token',json={
-#   "address": 'munyiri1@wireconnected.com',
-#   "password": "1000waystodie",
-# })
-
-# print(my_data.json())
-
-# received token and id
-
-# {'token': 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MDIzODQ0NjEsInJvbGVzIjpbIlJPTEVfVVNFUiJdLCJhZGRyZXNzIjoibXVueWlyaTFAd2lyZWNvbm5lY3RlZC5jb20iLCJpZCI6IjY1Nzg0ZjkxOWJhMjU2NWZmNjBmYmYwMyIsIm1lcmN1cmUiOnsic3Vic2NyaWJlIjpbIi9hY2NvdW50cy82NTc4NGY5MTliYTI1NjVmZjYwZmJmMDMiXX19.kHgYramr6D7IrYl5KYtzMsGikcWeeJwozRJBrDji1fccOrztbf1tnzpPuZRiF6ptTqSjRihglvMwU0UvlHhNyw', '@id': '/accounts/65784f919ba2565ff60fbf03', 'id': '65784f919ba2565ff60fbf03'}
-
-# get the messages received. From WIRED.com
-
 messages_request = BASE_URL + '/messages'
 
-messages = requests.get(messages_request,headers = MAILTM_HEADERS)
-
-# print(messages.json())
-
-new_messages = messages.json()
-
-# listen to messages
-
-webhook_url = 'https://mercure.mail.tm/.well-known/mercure'
-
-# all messages coming as read (remain as unread even after fetch), fetch message, save message id in a list
-read_messages_ids = []
-
-patch_url =  BASE_URL + '/messages/'
-
-# get messages periodically, get the messa
-# save all current messages as read. Mark all as read
-
+def getMessages(request,headers):
+    messages = requests.get(request,headers = headers)
+    print(messages.json())
+    return messages.json()
 
 def parseMail(obj):
     unread = []
@@ -116,18 +92,28 @@ def parseMail(obj):
 def displayMail(obj):
     # instantiate the class object from server.py
     new_mail = NewMailService()
-    
-
-# parseMail(new_messages)
-print(parseMail(new_messages))
+    mails_length = len(obj[0])
+    start = 0
+    while start < mails_length:
+        new_mail.on_new_mail(obj[0][start],obj[1][start])
+        start = start + 1
 
 # read the messages
-start = 0
-while (start < len(new_messages)):
-    msgid = new_messages[start]['msgid']
-    if new_messages[start]['seen'] == 'False':
-        requests.patch(patch_url + msgid,headers = MAILTM_HEADERS)
-        read_messages_ids.append(msgid)
-    read_messages_ids.append(msgid)
-    start = start + 1
+def readMessages(obj):
+    start = 0
+    while (start < len(obj)):
+        msgid = obj[start]['id']
+        if obj[start]['seen'] == 'False':
+            print(patch_url + msgid)
+            requests.patch(patch_url + msgid,headers = MAILTM_HEADERS)
+            start = start + 1
 
+def runAll():
+    new_messages = getMessages(messages_request,MAILTM_HEADERS)
+    parsed_messages = parseMail(new_messages)
+    displayMail(parsed_messages)
+    readMessages(new_messages)
+
+t = Timer(10, runAll)
+
+t.start()
